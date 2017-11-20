@@ -10,11 +10,11 @@ from argparse import ArgumentParser
 import cv2
 import scipy.io
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import cv2
 import pickle
 
-import pylab as pl
+# import pylab as pl
 import time
 import os
 import sys
@@ -23,7 +23,12 @@ import glob
 
 MAX_INPUT_DIM = 5000.0
 
-def save_roi(raw_img, refined_bboxes, target_folder):
+def directory_exist(directory):
+  if not os.path.exists(directory):
+    os.makedirs(directory)
+
+
+def save_roi(raw_img, refined_bboxes, fname, target_folder):
   """extract ROI and save in target folder.
     Args:
       raw_img:
@@ -43,8 +48,9 @@ def save_roi(raw_img, refined_bboxes, target_folder):
     
 
     roi = raw_img[_r[1]: _r[3], _r[0]:_r[2]]
-    print(type(roi), len(roi))
-    cv2.imwrite(target_folder+str(i)+'a.jpeg',roi)
+    # print(type(roi), len(roi))
+    cv2.imwrite(target_folder+fname+'_'+str(i)+'.jpeg',roi)
+    
     i=i+1
 
 
@@ -74,12 +80,12 @@ def overlay_bounding_boxes(raw_img, refined_bboxes, lw):
       _lw = int(np.ceil(_lw * _score))
 
     _r = [int(x) for x in r[:4]]
-    print("_r: ", _r)
+    # print("_r: ", _r)
     cv2.rectangle(raw_img, (_r[0], _r[1]), (_r[2], _r[3]), rect_color, _lw)
 
     
     
-def evaluate(weight_file_path, data_dir, output_dir, prob_thresh=0.5, nms_thresh=0.1, lw=3, display=False):
+def evaluate(weight_file_path, data_dir, output_dir, roi_dir, prob_thresh=0.5, nms_thresh=0.1, lw=3, display=False):
   """Detect faces in images.
   Args:
     prob_thresh:
@@ -144,7 +150,7 @@ def evaluate(weight_file_path, data_dir, output_dir, prob_thresh=0.5, nms_thresh
         scales_up = pl.frange(0.5, max_scale, 0.5)
         scales_pow = np.hstack((scales_down, scales_up))
         scales = np.power(2.0, scales_pow)"""
-        scales = np.array([0.5,1,1.5])
+        scales = np.array([0.1, 0.3,0.6])
         return scales
 
       scales = _calc_scales()
@@ -155,7 +161,7 @@ def evaluate(weight_file_path, data_dir, output_dir, prob_thresh=0.5, nms_thresh
 
       # process input at different scales
       for s in scales:
-        print("Processing {} at scale {:.4f}".format(fname, s))
+        # print("Processing {} at scale {:.4f}".format(fname, s))
         img = cv2.resize(raw_img_f, (0, 0), fx=s, fy=s, interpolation=cv2.INTER_LINEAR)
         img = img - average_image
         img = img[np.newaxis, :]
@@ -217,8 +223,8 @@ def evaluate(weight_file_path, data_dir, output_dir, prob_thresh=0.5, nms_thresh
                                                    max_output_size=bboxes.shape[0], iou_threshold=nms_thresh)
       refind_idx = sess.run(refind_idx)
       refined_bboxes = bboxes[refind_idx]
-      print ("refined_bboxes ", refined_bboxes)
-      save_roi(raw_img, refined_bboxes, '/home/pranoot/Desktop/tinyfaces/tinyfaces/roi/')
+      # print ("refined_bboxes ", refined_bboxes)
+      save_roi(raw_img, refined_bboxes, fname, roi_dir)
       overlay_bounding_boxes(raw_img, refined_bboxes, lw)
 
       if display:
@@ -230,30 +236,48 @@ def evaluate(weight_file_path, data_dir, output_dir, prob_thresh=0.5, nms_thresh
       raw_img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
       cv2.imwrite(os.path.join(output_dir, fname), raw_img)
 
-def main():
+def main(video_path, weight_file_path):
 
-  argparse = ArgumentParser()
-  argparse.add_argument('--weight_file_path', type=str, help='Pretrained weight file.', default="/path/to/mat2tf.pkl")
-  argparse.add_argument('--data_dir', type=str, help='Image data directory.', default="/path/to/input_image_directory")
-  argparse.add_argument('--output_dir', type=str, help='Output directory for images with faces detected.', default="/path/to/output_directory")
-  argparse.add_argument('--prob_thresh', type=float, help='The threshold of detection confidence(default: 0.5).', default=0.5)
-  argparse.add_argument('--nms_thresh', type=float, help='The overlap threshold of non maximum suppression(default: 0.1).', default=0.1)
-  argparse.add_argument('--line_width', type=int, help='Line width of bounding boxes(0: auto).', default=3)
-  argparse.add_argument('--display', type=bool, help='Display each image on window.', default=False)
+  # argparse = ArgumentParser()
+  # argparse.add_argument('--weight_file_path', type=str, help='Pretrained weight file.', default="/path/to/mat2tf.pkl")
+  # argparse.add_argument('--data_dir', type=str, help='Image data directory.', default="/path/to/input_image_directory")
+  # argparse.add_argument('--output_dir', type=str, help='Output directory for images with faces detected.', default="/path/to/output_directory")
+  # argparse.add_argument('--prob_thresh', type=float, help='The threshold of detection confidence(default: 0.5).', default=0.5)
+  # argparse.add_argument('--nms_thresh', type=float, help='The overlap threshold of non maximum suppression(default: 0.1).', default=0.1)
+  # argparse.add_argument('--line_width', type=int, help='Line width of bounding boxes(0: auto).', default=3)
+  # argparse.add_argument('--display', type=bool, help='Display each image on window.', default=False)
+  # argparse.add_argument('--roi_dir', type=str, help='roi directory.', default='path/to/roi_directory')
 
-  args = argparse.parse_args()
+  # args = argparse.parse_args()
+
+  dirname = os.path.dirname(os.path.realpath(__file__))
+  directory_exist(weight_file_path)
+  # print (data_dir)
+  data_dir = os.path.dirname(os.path.realpath(video_path)) + '/frames/'
+  directory_exist(data_dir)
+  output_dir = os.path.dirname(os.path.realpath(video_path)) + '/output/'
+  directory_exist(output_dir)
+  roi_dir = os.path.dirname(os.path.realpath(video_path)) + '/roi/'
+  directory_exist(roi_dir)
 
   # check arguments
-  assert os.path.exists(args.weight_file_path), "weight file: " + args.weight_file_path + " not found."
-  assert os.path.exists(args.data_dir), "data directory: " + args.data_dir + " not found."
-  assert os.path.exists(args.output_dir), "output directory: " + args.output_dir + " not found."
-  assert args.line_width >= 0, "line_width should be >= 0."
+  # assert os.path.exists(args.weight_file_path), "weight file: " + args.weight_file_path + " not found."
+  # assert os.path.exists(args.data_dir), "data directory: " + args.data_dir + " not found."
+  # assert os.path.exists(args.output_dir), "output directory: " + args.output_dir + " not found."
+  # assert os.path.exists(args.roi_dir), "output directory: " + args.roi_dir + " not found."
+  # assert args.line_width >= 0, "line_width should be >= 0."
+
+  # with tf.Graph().as_default():
+  #   evaluate(
+  #     weight_file_path=args.weight_file_path, data_dir=args.data_dir, output_dir=args.output_dir, roi_dir=args.roi_dir,
+  #     prob_thresh=args.prob_thresh, nms_thresh=args.nms_thresh,
+  #     lw=args.line_width, display=args.display)
 
   with tf.Graph().as_default():
     evaluate(
-      weight_file_path=args.weight_file_path, data_dir=args.data_dir, output_dir=args.output_dir,
-      prob_thresh=args.prob_thresh, nms_thresh=args.nms_thresh,
-      lw=args.line_width, display=args.display)
+      weight_file_path=weight_file_path, data_dir=data_dir, output_dir=output_dir, roi_dir=roi_dir)
 
-if __name__ == '__main__':
-  main()
+# if __name__ == '__main__':
+#   start_ = time.time()
+#   main()
+#   print "total time for roi : ", time.time() - start_
